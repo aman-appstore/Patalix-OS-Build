@@ -1,4 +1,4 @@
-name: Build Patalix OS for Violet (Final Fix)
+name: Build Patalix OS for Violet (Super Fix)
 
 on:
   workflow_dispatch:
@@ -7,20 +7,20 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Free Disk Space (Ultra)
+      - name: Free Disk Space
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost
           sudo docker image prune -a -f
-          df -h
 
-      - name: Setup Environment (Fixed)
+      - name: Setup Environment (No-Error Mode)
         run: |
           sudo apt-get update
-          sudo apt-get install -y bc bison build-essential ccache curl flex g++-multilib gcc-multilib git gnupg gperf imagemagick lib32readline-dev lib32z1-dev liblz4-tool libncurses5 libncurses5-dev libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev
-          # lib32ncurses5-dev को अलग से इंस्टॉल करना सुरक्षित है क्योंकि कभी-कभी यह नहीं मिलता
-          sudo apt-get install -y lib32ncurses5-dev || echo "Skipping optional package"
+          # जो पैकेज नाम बदल चुके हैं, उन्हें हमने हटा दिया है या उनके नए नाम डाल दिए हैं
+          sudo apt-get install -y bc bison build-essential ccache curl flex g++-multilib gcc-multilib git gnupg gperf imagemagick lib32readline-dev lib32z1-dev liblz4-tool libncurses-dev libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync精彩 schedtool squashfs-tools xsltproc zip zlib1g-dev
+          # पुराने पैकेजों के लिए एरर न आए इसलिए '|| true' लगाया है
+          sudo apt-get install -y libncurses5 lib32ncurses5-dev || true
 
-      - name: Sync Source (Shallow Clone)
+      - name: Sync Source (Shallow)
         run: |
           mkdir build && cd build
           repo init -u https://github.com/DerpFest-AOSP/manifest.git -b 15 --git-lfs --depth=1
@@ -32,13 +32,11 @@ jobs:
           grep -rl 'DerpFest' . | xargs sed -i 's/DerpFest/Patalix OS/g' || true
           echo "PRODUCT_NAME := Patalix OS" >> vendor/derp/config/common.mk
           echo "TARGET_INCLUDE_PIXEL_AI_FEATURES := true" >> vendor/derp/config/common.mk
-          echo "PRODUCT_PROPERTY_OVERRIDES += persist.vendor.camera.HAL3.enabled=1" >> vendor/derp/config/common.mk
 
       - name: Generate Minimal Bootanimation
         run: |
           cd build
           mkdir -p patalix_boot/part0
-          # Imagemagick का इस्तेमाल करके सिंपल एनीमेशन
           convert -size 1080x2340 xc:black -gravity center -pointsize 80 -fill white -draw "text 0,0 'Patalix OS'" patalix_boot/part0/00001.png
           echo "1080 2340 30" > patalix_boot/desc.txt
           echo "p 1 0 part0" >> patalix_boot/desc.txt
@@ -63,5 +61,5 @@ jobs:
       - name: Upload Build
         uses: actions/upload-artifact@v4
         with:
-          name: Patalix-OS-Violet-Official
+          name: Patalix-OS-Violet-Final
           path: build/out/target/product/violet/*.zip
