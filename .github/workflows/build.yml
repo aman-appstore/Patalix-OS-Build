@@ -1,4 +1,4 @@
-name: Build Patalix OS for Violet (Premium AI Edition)
+name: Build Patalix OS for Violet (Fixed Space)
 
 on:
   workflow_dispatch:
@@ -7,60 +7,51 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Maximize Build Space
-        uses: easimon/maximize-build-space@master
-        with:
-          root-reserve-mb: 512
-          swap-size-mb: 1024
-          remove-dotnet: 'true'
-          remove-android: 'true'
+      # स्पेस खाली करने का सबसे तगड़ा तरीका
+      - name: Free Disk Space (Ultra)
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/local/share/boost
+          sudo docker image prune -a -f
+          df -h
 
       - name: Setup Environment
         run: |
           sudo apt update
-          sudo apt install bc bison build-essential ccache curl flex g++-multilib gcc-multilib git gnupg gperf imagemagick lib32ncurses5-dev lib32readline-dev lib32z1-dev liblz4-tool libncurses5 libncurses5-dev libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync bundle-assistant schedtool squashfs-tools xsltproc zip zlib1g-dev -y
+          sudo apt install bc bison build-essential ccache curl flex g++-multilib gcc-multilib git gnupg gperf imagemagick lib32ncurses5-dev lib32readline-dev lib32z1-dev liblz4-tool libncurses5 libncurses5-dev libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev -y
 
-      - name: Sync Source (DerpFest Base)
+      - name: Sync Source (Shallow Clone for Space)
         run: |
           mkdir build && cd build
-          repo init -u https://github.com/DerpFest-AOSP/manifest.git -b 15 --git-lfs
+          repo init -u https://github.com/DerpFest-AOSP/manifest.git -b 15 --git-lfs --depth=1
           repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags
 
       - name: Patalix OS Branding & AI Integration
         run: |
           cd build
-          # 1. पूरे सिस्टम में नाम बदलना (Settings, About Phone)
           grep -rl 'DerpFest' . | xargs sed -i 's/DerpFest/Patalix OS/g' || true
-          
-          # 2. प्रीमियम AI फीचर्स और GCam (HAL3) सपोर्ट जोड़ना
           echo "PRODUCT_NAME := Patalix OS" >> vendor/derp/config/common.mk
           echo "TARGET_INCLUDE_PIXEL_AI_FEATURES := true" >> vendor/derp/config/common.mk
-          echo "TARGET_SUPPORTS_NEXT_GEN_ASSISTANT := true" >> vendor/derp/config/common.mk
           echo "PRODUCT_PROPERTY_OVERRIDES += persist.vendor.camera.HAL3.enabled=1" >> vendor/derp/config/common.mk
 
-      - name: Generate Lightweight Patalix Bootanimation
+      - name: Generate Minimal Bootanimation
         run: |
           cd build
           mkdir -p patalix_boot/part0
-          # ब्लैक बैकग्राउंड पर व्हाइट "Patalix OS" टेक्स्ट के साथ इमेज बनाना (Minimal & Smooth)
           convert -size 1080x2340 xc:black -gravity center -font DejaVu-Sans -pointsize 80 -fill white -draw "text 0,0 'Patalix OS'" patalix_boot/part0/00001.png
-          
-          # एनीमेशन की सेटिंग फाइल (1080x2340 Resolution, 30 FPS)
           echo "1080 2340 30" > patalix_boot/desc.txt
           echo "p 1 0 part0" >> patalix_boot/desc.txt
-          
-          # बिना कंप्रेशन के ज़िप बनाना ताकि फोन पर लोड कम पड़े
           cd patalix_boot && zip -0r ../bootanimation.zip . && cd ..
-          
-          # पुराने एनीमेशन को हटाकर नया Patalix एनीमेशन डालना
           cp bootanimation.zip vendor/derp/prebuilt/common/bootanimation/bootanimation.zip
 
       - name: Sync Device Sources (Violet)
         run: |
           cd build
-          git clone https://github.com/DerpFest-Devices/device_xiaomi_violet.git -b 15 device/xiaomi/violet
-          git clone https://github.com/DerpFest-Devices/kernel_xiaomi_violet.git -b 15 kernel/xiaomi/violet
-          git clone https://github.com/DerpFest-Devices/vendor_xiaomi_violet.git -b 15 vendor/xiaomi
+          git clone https://github.com/DerpFest-Devices/device_xiaomi_violet.git -b 15 --depth=1 device/xiaomi/violet
+          git clone https://github.com/DerpFest-Devices/kernel_xiaomi_violet.git -b 15 --depth=1 kernel/xiaomi/violet
+          git clone https://github.com/DerpFest-Devices/vendor_xiaomi_violet.git -b 15 --depth=1 vendor/xiaomi
 
       - name: Build ROM
         run: |
