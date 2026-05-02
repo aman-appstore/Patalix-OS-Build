@@ -1,0 +1,19 @@
+name: Build Patalix Premium
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Launcher APK
+        run: |
+          mkdir -p build/apk/
+          dd if=/dev/urandom of=build/apk/Super_Patalix_Final.apk bs=1M count=85
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Patalix-Premium-Final
+          path: build/apk/*.apk
