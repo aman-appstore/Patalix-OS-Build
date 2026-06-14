@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="user-scalable=no, initial-scale=1, maximum-scale=1, minimum-scale=1, width=device-width, viewport-fit=cover">
+    <title>6-Player Ludo King Simple</title>
+    
+    <style>
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: rgba(0,0,0,0); /* Mobile touch flash hatane ke liye */
+        }
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #1e272e;
+            color: white;
+            margin: 0;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        /* Setup Screen */
+        .setup-screen {
+            background: #2f3640;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+            width: 90%;
+            max-width: 400px;
+        }
+        select, button {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border: none;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        select { background: white; color: #333; }
+        button { background: #e74c3c; color: white; cursor: pointer; }
+        button:active { background: #c0392b; }
+
+        /* Game Screen */
+        .hidden { display: none !important; }
+        .game-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+        }
+
+        /* Top Control Bar */
+        .control-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            max-width: 450px;
+            margin-bottom: 10px;
+            background: #2f3640;
+            padding: 10px 15px;
+            border-radius: 8px;
+        }
+        #current-turn {
+            padding: 5px 15px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        #dice-btn {
+            width: auto;
+            margin: 0;
+            padding: 8px 20px;
+            background: #2ecc71;
+        }
+        #dice-btn:active { background: #27ae60; }
+
+        /* Responsive 15x15 Grid Board */
+        .ludo-board {
+            display: grid;
+            grid-template-columns: repeat(15, 1fr);
+            grid-template-rows: repeat(15, 1fr);
+            gap: 1px;
+            background: #718093;
+            width: 100%;
+            max-width: 450px;
+            aspect-ratio: 1 / 1; /* Board ko hamesha square rakhega */
+            border: 4px solid #2f3640;
+            border-radius: 8px;
+        }
+        .cell {
+            background: #f5f6fa;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 9px;
+            color: #7f8c8d;
+            position: relative;
+        }
+
+        /* Players color coding (Ludo King style) */
+        .p1 { background-color: #ea2027 !important; color: white !important; } /* Red */
+        .p2 { background-color: #4cd137 !important; color: white !important; } /* Green */
+        .p3 { background-color: #fbc531 !important; color: black !important; } /* Yellow */
+        .p4 { background-color: #00a8ff !important; color: white !important; } /* Blue */
+        .p5 { background-color: #9c88ff !important; color: white !important; } /* Purple */
+        .p6 { background-color: #e17055 !important; color: white !important; } /* Orange */
+
+        /* Goti (Token) Style */
+        .goti {
+            width: 75%;
+            height: 75%;
+            border-radius: 50%;
+            border: 2px solid white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+            animation: bounce 0.4s infinite alternate;
+        }
+        @keyframes bounce {
+            from { transform: translateY(0); }
+            to { transform: translateY(-3px); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="setup-screen" id="setup-screen">
+        <h2>Ludo King (2-6 Players)</h2>
+        <p>Players ki ginti chunein:</p>
+        <select id="player-count">
+            <option value="2">2 Players (Red, Green)</option>
+            <option value="3">3 Players (Red, Green, Yellow)</option>
+            <option value="4">4 Players (Red, Green, Yellow, Blue)</option>
+            <option value="5">5 Players (Red, Green, Yellow, Blue, Purple)</option>
+            <option value="6">6 Players (Red, Green, Yellow, Blue, Purple, Orange)</option>
+        </select>
+        <button onclick="initLudoGame()">GAME START</button>
+    </div>
+
+    <div class="game-screen hidden" id="game-screen">
+        <div class="control-bar">
+            <div id="current-turn" class="p1">Turn: P1</div>
+            <button id="dice-btn" onclick="rollDice()">ROLL 🎲</button>
+            <div id="dice-result" style="font-size: 20px;">🎲: -</div>
+        </div>
+        
+        <div class="ludo-board" id="board-grid">
+            </div>
+    </div>
+
+    <script src="cordova.js"></script>
+
+    <script>
+        let totalPlayers = 2;
+        let activePlayer = 1;
+        let currentDiceRoll = 0;
+        let playerPositions = {};
+        const playerClasses = { 1: 'p1', 2: 'p2', 3: 'p3', 4: 'p4', 5: 'p5', 6: 'p6' };
+
+        // Cordova Device Ready Event Listener
+        document.addEventListener('deviceready', onDeviceReady, false);
+        function onDeviceReady() {
+            console.log("Cordova is ready!");
+        }
+
+        function initLudoGame() {
+            totalPlayers = parseInt(document.getElementById('player-count').value);
+            document.getElementById('setup-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+
+            // Har player ko safe position/home par set karna (0 = Home)
+            for (let i = 1; i <= totalPlayers; i++) {
+                playerPositions[i] = 0;
+            }
+
+            buildBoard();
+            updateTurnIndicator();
+        }
+
+        function buildBoard() {
+            const board = document.getElementById('board-grid');
+            board.innerHTML = '';
+
+            // 15x15 = 225 Cells create karna
+            for (let i = 1; i <= 225; i++) {
+                const cell = document.createElement('div');
+                cell.classList.add('cell');
+                cell.id = `cell-${i}`;
+                
+                // Track numbers ko halka dikhane ke liye (Development testing)
+                cell.innerText = i; 
+
+                // Cell click karne par goti chale iska event
+                cell.onclick = () => moveGoti(i);
+                board.appendChild(cell);
+            }
+            drawPlayersOnBoard();
+        }
+
+        function rollDice() {
+            if (currentDiceRoll !== 0) return; // Pehle purani chal chalni hogi
+
+            currentDiceRoll = Math.floor(Math.random() * 6) + 1;
+            document.getElementById('dice-result').innerText = `🎲: ${currentDiceRoll}`;
+
+            // Ludo King Rule: Agar ghar me (0 par) hai aur 6 nahi aaya, toh turn automatic change ho jayegi
+            if (playerPositions[activePlayer] === 0 && currentDiceRoll !== 6) {
+                setTimeout(() => {
+                    currentDiceRoll = 0;
+                    document.getElementById('dice-result').innerText = `🎲: -`;
+                    switchTurn();
+                }, 1000);
+            }
+        }
+
+        function moveGoti(clickedCellId) {
+            if (currentDiceRoll === 0) return;
+
+            let currentPos = playerPositions[activePlayer];
+
+            // 1. Agar goti home (0) par hai aur 6 aaya, toh track par nikalo
+            if (currentPos === 0 && currentDiceRoll === 6) {
+                // Har player ka apna alag suruati point (Example logic)
+                playerPositions[activePlayer] = activePlayer * 20; 
+                currentDiceRoll = 0;
+                drawPlayersOnBoard();
+                return; // 6 aane par dubara mauka milta hai, isliye turn change nahi ki
+            } 
+            
+            // 2. Agar goti pehle se baahar hai, toh clicked wale cell par click karke aage badhao
+            else if (currentPos > 0) {
+                let targetCell = currentPos + currentDiceRoll;
+                if (targetCell <= 225) { // Board ke andar limit boundary
+                    playerPositions[activePlayer] = targetCell;
+                    
+                    // Ludo King rule: Kisi ki goti katna (Simple overlapping logic)
+                    for (let p in playerPositions) {
+                        if (p != activePlayer && playerPositions[p] === targetCell) {
+                            playerPositions[p] = 0; // Dusre ki goti wapas ghar gayi
+                            alert(`Player ${activePlayer} ne Player ${p} ki goti kaat di!`);
+                        }
+                    }
+
+                    currentDiceRoll = 0;
+                    drawPlayersOnBoard();
+                    switchTurn();
+                }
+            }
+        }
+
+        function switchTurn() {
+            activePlayer = (activePlayer >= totalPlayers) ? 1 : activePlayer + 1;
+            updateTurnIndicator();
+        }
+
+        function updateTurnIndicator() {
+            const turnDiv = document.getElementById('current-turn');
+            turnDiv.innerText = `Turn: Player ${activePlayer}`;
+            turnDiv.className = playerClasses[activePlayer];
+            document.getElementById('dice-result').innerText = `🎲: -`;
+        }
+
+        function drawPlayersOnBoard() {
+            // Purane tokens delete karna
+            document.querySelectorAll('.goti').forEach(g => g.remove());
+
+            // Naye positions par goti render karna
+            for (let player in playerPositions) {
+                let pos = playerPositions[player];
+                if (pos > 0) {
+                    let cell = document.getElementById(`cell-${pos}`);
+                    if (cell) {
+                        let gotiElement = document.createElement('div');
+                        gotiElement.classList.add('goti', playerClasses[player]);
+                        cell.appendChild(gotiElement);
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>
